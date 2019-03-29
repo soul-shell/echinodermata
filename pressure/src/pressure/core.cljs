@@ -6,50 +6,55 @@
 
 (defn spirograph [R r a x-scale y-scale t]
   [(* x-scale
-     (+ (* (- R r) (q/cos (* (/ r R) t)))
-        (* a (q/cos (* (- 1 (/ r R)) t)))))
+     (+ (* (- R r) (Math/cos (* (/ r R) t)))
+        (* a (Math/cos (* (- 1 (/ r R)) t)))))
    (* y-scale
-     (+ (* (- R r) (q/sin (* (/ r R) t)))
-        (* a (q/sin (* (- 1 (/ r R)) t)))))])
+     (+ (* (- R r) (Math/sin (* (/ r R) t)))
+        (* a (Math/sin (* (- 1 (/ r R)) t)))))])
 
 (def spirograph-functions
   [(partial spirograph 5 4 3 40 40)
    (partial spirograph 5 1 1 40 40)])
 
-(def ^:const max-t (* 10 q/PI))
+(def ^:const max-t (* 10 Math/PI))
+(def ^:const t-trail-len (* 5 Math/PI))
+(def ^:const dt 0.02)
+(def ^:const dt-steps-trail (/ t-trail-len dt))
+(def ^:const dalpha (/ 255 dt-steps-trail))
 
 (defn setup []
   (q/frame-rate 60)
-  (q/color-mode :hsb)
+  (q/color-mode :hsb 360 100 100)
   ; initial state
   {:t 0
    :fn-index 0})
 
 (defn update-state [state]
   (if (< (:t state) max-t)
-    (update state :t + 0.2)
+    (update state :t + 0.1)
     (-> state
       (assoc :t 0)
       (update :fn-index (fn [i] (mod (inc i) (count spirograph-functions)))))))
 
-(defn draw-plot [f from to step]
-  (doseq [two-points (->> (range from to step)
-                          (map f)
-                          (partition 2 1))]
-    (apply q/line two-points)))
+(defn point-pairs-with-step [f from to step]
+  (->> (range from to step) (map f) (partition 2 1)))
 
 (defn draw-state [state]
-  (q/background 255)
-    ; move origin point to the center of the sketch.
-    (q/with-translation [(/ (q/width) 2)
-                         (/ (q/height) 2)]
-      (if (> (:fn-index state) 0)
-        (let [prev-index (-> state :fn-index (- 1))
-              prev-fn (nth spirograph-functions prev-index)]
-          (println prev-fn)
-          (draw-plot prev-fn (:t state) max-t 0.02)))
-      (let [spiro-fn (nth spirograph-functions (:fn-index state))]
-        (draw-plot spiro-fn 0 (:t state) 0.02))))
+  ; reset the canvas
+  (q/background 180 80 60)
+  (q/stroke-weight 8)
+  ; move the origin point to the center
+  (q/with-translation [(/ (q/width) 2)
+                       (/ (q/height) 2)]
+    (let [t (:t state)
+          from-t (max 0 (- t t-trail-len))
+          spiro-fn (nth spirograph-functions (:fn-index state))
+          point-pairs (point-pairs-with-step spiro-fn from-t t dt)
+          dt-steps (/ (min t t-trail-len) dt)
+          start-alpha (* dalpha (- dt-steps-trail dt-steps))]
+      (doseq [[i pts] (map-indexed vector point-pairs)]
+        (q/stroke 180 35 98 (+ start-alpha (* i dalpha)))
+        (apply q/line pts)))))
 
 (defn ^:export run-sketch []
   (q/defsketch pressure
